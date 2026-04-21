@@ -41,45 +41,62 @@ class AuthHandler {
     // LOGIN
     router.post('/login', (Request request) async {
       final payload = jsonDecode(await request.readAsString());
-      final conn = await Database.getConnection();
-
+      
       try {
-        final results = await conn.query(
-          'SELECT * FROM users WHERE email = ? AND password = ?',
-          [payload['email'], payload['password']],
-        );
+        final conn = await Database.getConnection();
+        
+        try {
+          // BOOTSTRAP CHECK: If no users exist, insert defaults
+          final userCount = await conn.query('SELECT COUNT(*) as total FROM users');
+          if (userCount.first['total'] == 0) {
+            print('AUTH: No users found. Bootstrapping default accounts...');
+            await conn.query(
+              'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?), (?, ?, ?, ?)',
+              ['Admin User', 'admin@hotel.com', 'admin123', 'admin', 'Customer One', 'user@gmail.com', 'user123', 'customer']
+            );
+          }
 
-        if (results.isNotEmpty) {
-          final user = results.first;
-          return Response.ok(
-            jsonEncode({
-              'status': 'success',
-              'message': 'Login successful',
-              'user': {
-                'id': user['id'],
-                'name': user['name'],
-                'email': user['email'],
-                'role': user['role'],
-                'phone': user['phone'] ?? ''
-              }
-            }),
-            headers: _jsonHeaders,
+          final results = await conn.query(
+            'SELECT * FROM users WHERE email = ? AND password = ?',
+            [payload['email'], payload['password']],
           );
-        } else {
-          return Response.forbidden(
-            jsonEncode({'status': 'error', 'message': 'Invalid email or password'}),
-            headers: _jsonHeaders,
-          );
+
+          if (results.isNotEmpty) {
+            final user = results.first;
+            print('AUTH: Login success for ${user['email']}');
+            return Response.ok(
+              jsonEncode({
+                'status': 'success',
+                'message': 'Login successful',
+                'user': {
+                  'id': user['id'],
+                  'name': user['name'],
+                  'email': user['email'],
+                  'role': user['role'],
+                  'phone': user['phone'] ?? ''
+                }
+              }),
+              headers: _jsonHeaders,
+            );
+          } else {
+            print('AUTH: Login failed - Invalid credentials for ${payload['email']}');
+            return Response.forbidden(
+              jsonEncode({'status': 'error', 'message': 'Invalid email or password'}),
+              headers: _jsonHeaders,
+            );
+          }
+        } finally {
+          await conn.close();
         }
       } catch (e) {
-        return Response.internalServerError(
-          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+        print('AUTH: Login error - $e');
+        return Response(503, // Service Unavailable (DB Down)
+          body: jsonEncode({'status': 'error', 'message': 'Database connection failed. Please check your SQL server.'}),
           headers: _jsonHeaders,
         );
-      } finally {
-        await conn.close();
       }
     });
+
 
     // UPDATE PROFILE
     router.post('/update-profile', (Request request) async {

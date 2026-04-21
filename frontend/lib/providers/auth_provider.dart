@@ -10,8 +10,10 @@ class AuthProvider extends ChangeNotifier {
 
   String phone = "";
   String joiningDate = "";
+  String errorMessage = ""; // Added to track specific server errors
 
   bool isLoggedIn = false;
+
 
   // ================= LOAD USER =================
   Future<void> loadUser() async {
@@ -78,6 +80,7 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
+    errorMessage = ""; // Reset
     final response = await AuthService.login(
       email: email,
       password: password,
@@ -101,10 +104,14 @@ class AuthProvider extends ChangeNotifier {
 
       notifyListeners();
       return true;
+    } else {
+      errorMessage = response['message'] ?? "Unknown error occurred";
+      notifyListeners();
     }
 
     return false;
   }
+
 
   // ================= CHANGE PASSWORD (API based) =================
   Future<bool> changePassword(String newPassword) async {

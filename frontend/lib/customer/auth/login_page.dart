@@ -44,9 +44,13 @@ class _LoginPageState extends State<LoginPage> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid email or password")),
+        SnackBar(
+          content: Text(auth.errorMessage),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
+
   }
 
   Widget field(TextEditingController c, String hint,
